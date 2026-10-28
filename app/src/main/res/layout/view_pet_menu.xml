@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#E6241A36"
+    android:padding="6dp">
+
+    <Button android:id="@+id/menu_bigger"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minWidth="180dp"
+        android:textAllCaps="false"
+        android:text="Bigger" />
+
+    <Button android:id="@+id/menu_smaller"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textAllCaps="false"
+        android:text="Smaller" />
+
+    <Button android:id="@+id/menu_reset"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textAllCaps="false"
+        android:text="Reset position" />
+
+    <Button android:id="@+id/menu_close_chat"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textAllCaps="false"
+        android:text="Chat panel" />
+
+    <Button android:id="@+id/menu_open_settings"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textAllCaps="false"
+        android:text="Open settings" />
+
+    <Button android:id="@+id/menu_hide"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textAllCaps="false"
+        android:text="Hide pet" />
+</LinearLayout>

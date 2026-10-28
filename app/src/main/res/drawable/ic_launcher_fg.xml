@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- halo -->
+    <path
+        android:strokeColor="#ffd166"
+        android:strokeWidth="4"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M40,34 a14,5 0 1,0 28,0 a14,5 0 1,0 -28,0" />
+    <!-- stylized A -->
+    <path
+        android:fillColor="#f7f2ff"
+        android:pathData="M54,44 L64,78 L57,78 L55.2,70 L48.8,70 L47,78 L40,78 Z M52.6,55 L50.2,64 L53.8,64 Z" />
+    <!-- cheerful mouth -->
+    <path
+        android:strokeColor="#ffd166"
+        android:strokeWidth="2.5"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M50,66 q4,4 8,0" />
+</vector>

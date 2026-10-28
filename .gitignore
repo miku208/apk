@@ -1,0 +1,10 @@
+.gradle/
+build/
+app/build/
+.kotlin/
+local.properties
+
+# Local signing material — never commit these.
+keystore.properties
+app/*.jks
+app/*.keystore

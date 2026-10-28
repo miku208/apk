@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Arisu Companion</string>
+    <string name="notif_channel_pet">Arisu companion</string>
+    <string name="notif_title">Arisu is floating around</string>
+    <string name="notif_text">Tap to open the app · actions to hide the pet or stop the service</string>
+    <string name="notif_action_hide">Hide pet</string>
+    <string name="notif_action_show">Show pet</string>
+    <string name="notif_action_stop">Stop</string>
+</resources>
