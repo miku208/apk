@@ -7,8 +7,8 @@ import org.junit.Test
 class ProviderProfileTest {
 
     private fun profile(
-        baseUrl: String = "https://integrate.api.nvidia.com/v1",
-        modelId: String = "meta/llama-3.1-8b-instruct",
+        baseUrl: String = "https://api.example.com/v1",
+        modelId: String = "some-model",
         keyCipher: String = "cipher",
     ) = ProviderProfile(
         id = "t",
@@ -19,18 +19,26 @@ class ProviderProfileTest {
     )
 
     @Test
-    fun `builtins exist and validate`() {
+    fun `google ai studio is the only builtin provider`() {
         val builtins = ProviderProfile.builtins()
-        assertEquals(5, builtins.size)
-        assertTrue("Gemini is a first-class provider", builtins.any { it.kind == ProviderKind.GEMINI })
-        builtins.forEach { p ->
-            assertTrue("builtin ${p.id} has a base url", p.baseUrl.startsWith("http"))
-            if (p.id != "custom") {
-                // Cloud providers must be verified https endpoints; "custom"
-                // deliberately defaults to localhost (local LLM servers).
-                assertTrue("builtin ${p.id} uses https", p.baseUrl.startsWith("https://"))
-            }
-        }
+        assertEquals(1, builtins.size)
+        val studio = builtins.single()
+        assertEquals(ProviderProfile.GEMINI_ID, studio.id)
+        assertEquals("Google AI Studio", studio.name)
+        assertEquals(ProviderKind.GEMINI, studio.kind)
+        assertTrue("base url is the AI Studio API root", studio.baseUrl.startsWith("https://generativelanguage.googleapis.com"))
+        assertEquals(GeminiProtocol.DEFAULT_CHAT_MODEL, studio.modelId)
+        assertEquals(GeminiProtocol.DEFAULT_IMAGE_MODEL, studio.imageModelId)
+        // Gemini authenticates with ?key= inside the URL, never a Bearer header.
+        assertEquals(ProviderProfile.AuthScheme.NONE, studio.authScheme)
+    }
+
+    @Test
+    fun `default profile is a gemini profile`() {
+        val default = ProviderProfile.default()
+        assertEquals(ProviderKind.GEMINI, default.kind)
+        assertTrue(default.isGemini)
+        assertTrue(default.baseUrl.startsWith("https://generativelanguage.googleapis.com"))
     }
 
     @Test

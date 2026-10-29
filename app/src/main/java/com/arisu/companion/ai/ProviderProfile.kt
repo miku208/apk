@@ -49,45 +49,22 @@ data class ProviderProfile(
 
     companion object {
         /**
-         * Built-in provider catalog. Every https endpoint here is the provider's
-         * documented API host; the two "unverified" entries keep a manual base
-         * URL the user is expected to confirm.
+         * Built-in provider catalog.
+         *
+         * The app ships exactly one provider: Google AI Studio's native Gemini
+         * API (`https://aistudio.google.com/apikey`). Every account uses its own
+         * key, and nothing else is preconfigured, so there is no ambiguity about
+         * which endpoint a chat goes to.
          */
         fun builtins(): List<ProviderProfile> = listOf(
             ProviderProfile(
-                id = "gemini",
-                name = "Google Gemini",
+                id = GEMINI_ID,
+                name = "Google AI Studio",
                 baseUrl = GeminiProtocol.DEFAULT_BASE_URL,
                 modelId = GeminiProtocol.DEFAULT_CHAT_MODEL,
                 imageModelId = GeminiProtocol.DEFAULT_IMAGE_MODEL,
                 kind = ProviderKind.GEMINI,
                 authScheme = AuthScheme.NONE,
-            ),
-            ProviderProfile(
-                id = "nvidia",
-                name = "NVIDIA API",
-                baseUrl = "https://integrate.api.nvidia.com/v1",
-                modelId = "meta/llama-3.1-8b-instruct",
-            ),
-            ProviderProfile(
-                id = "tokenharbor",
-                name = "TokenHarbor",
-                // OpenAI-compatible layout assumed but NOT independently verified —
-                // keep the base URL editable and confirm the docs of your account.
-                baseUrl = "https://api.tokenharbor.com/v1",
-                modelId = "",
-            ),
-            ProviderProfile(
-                id = "openrouter",
-                name = "OpenRouter",
-                baseUrl = "https://openrouter.ai/api/v1",
-                modelId = "openai/gpt-4o-mini",
-            ),
-            ProviderProfile(
-                id = "custom",
-                name = "Custom OpenAI-compatible",
-                baseUrl = "http://localhost:1234/v1",
-                modelId = "",
             ),
         )
 

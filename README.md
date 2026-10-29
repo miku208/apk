@@ -2,7 +2,7 @@
 
 A native Android application that renders a 3D character in a **transparent
 floating overlay window** above other apps, with a floating chat panel, BYOK AI
-providers (OpenAI-compatible **and** Google AI Studio / Gemini), local chat
+providers (Google AI Studio / Gemini), local chat
 history/memory, and optional push-to-talk voice.
 
 Version 0.2 adds a **Pet Library** (import your own `.glb` / `.gltf`+ZIP
@@ -111,15 +111,19 @@ application never *claims* an animation exists:
 Materials, textures (all embedded), the 4 skeletons and the 215-node scene
 graph are used as-is; the model is only normalized (centered/scaled) at load.
 
-## AI providers (BYOK)
+## AI provider (BYOK)
 
-OpenAI-compatible `/chat/completions` with `Authorization: Bearer`. Verified
-defaults ship for **NVIDIA API** (`https://integrate.api.nvidia.com/v1`) and
-**OpenRouter**. **TokenHarbor** and **Custom** ship as editable templates with a
- clearly-stated format note — no API compatibility is claimed beyond the
- OpenAI-compatible request/response surface implemented here. API keys are
- encrypted at rest (AES-256-GCM, key in AndroidKeyStore), never logged, and
- never exported with chat backups.
+**Google AI Studio** is the only provider: the native Gemini API
+(`https://generativelanguage.googleapis.com/v1beta`, `?key=…`, never a Bearer
+header). Each user pastes their own key from
+<https://aistudio.google.com/apikey>; the app never ships or asks for a
+developer key. Default chat model `gemini-3.1-flash-lite`, optional image model
+`gemini-3.1-flash-image`, plus manual model-ID entry and a Test Connection
+button. Keys are encrypted at rest (AES-256-GCM, key in AndroidKeyStore), never
+logged, and never exported with chat backups. Profiles saved by older builds
+that pointed at other endpoints are dropped on upgrade and the selection moves
+to AI Studio automatically. The OpenAI-compatible transport (`AiClient`,
+`SseParser`) is still in the tree but is no longer offered in the UI.
 
 ## Verified build results (this environment)
 
@@ -127,7 +131,7 @@ Built and tested here with JDK 21, Android SDK platform 34 / build-tools 34.0.0,
 Gradle 8.7 (no Android device or emulator available):
 
 ```
-:app:testDebugUnitTest   30 tests, 0 failures, 0 errors, 0 skipped
+:app:testReleaseUnitTest  72 tests, 0 failures, 0 errors, 0 skipped
 :app:assembleDebug       BUILD SUCCESSFUL
 :app:assembleRelease     BUILD SUCCESSFUL  (R8 shrink + resource shrink + signing)
 

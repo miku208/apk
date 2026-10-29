@@ -70,12 +70,11 @@ fun AiSettingsScreen(activity: MainActivity) {
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("AI providers (BYOK)", style = MaterialTheme.typography.headlineSmall)
+        Text("Google AI Studio (BYOK)", style = MaterialTheme.typography.headlineSmall)
         Text(
-            "BYOK: key disimpan terenkripsi di perangkat ini saja, tidak pernah dikirim ke mana pun " +
-                "selain ke provider yang kamu pilih. Profil \"Google Gemini\" memakai API resmi AI Studio " +
-                "(models/…:generateContent); profil lain memakai format OpenAI-compatible " +
-                "POST {base}/chat/completions.",
+            "Aplikasi memakai API resmi Google AI Studio (models/…:generateContent). Key kamu " +
+                "disimpan terenkripsi di perangkat ini saja dan hanya dikirim ke " +
+                "generativelanguage.googleapis.com — tidak ada provider lain yang dipakai.",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -106,7 +105,7 @@ fun AiSettingsScreen(activity: MainActivity) {
                     value = draft.baseUrl,
                     onValueChange = { url -> drafts = drafts + (editable.id to draft.copy(baseUrl = url.trim())) },
                     label = { Text("Base URL") },
-                    supportingText = { Text("Without /chat/completions") },
+                    supportingText = { Text("API root, tanpa /models/…:generateContent") },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(

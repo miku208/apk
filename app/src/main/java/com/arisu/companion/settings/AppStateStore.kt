@@ -46,11 +46,27 @@ class AppStateStore(context: Context, private val crypto: CryptoStore) {
     private fun loadProfiles(): ProviderProfilesValue {
         val defaults = defaultProfileValue()
         val raw = prefs.getString(KEY_PROFILES, null) ?: return defaults
-        return try {
+        val stored = try {
             json.decodeFromString<ProviderProfilesValue>(raw)
         } catch (_: Exception) {
-            defaults
+            return defaults
         }
+        // Google AI Studio is the only provider now. Drop profiles saved by
+        // older builds that pointed at other endpoints, and keep the selection
+        // on whatever is actually left, so an upgrade never leaves the chat
+        // pointing at a provider the UI can no longer show.
+        val kept = stored.profiles.filter { it.isGemini }
+        if (kept.isEmpty()) return defaults
+        val activeId = kept.firstOrNull { it.id == stored.activeId }?.id ?: kept.first().id
+        if (kept.size != stored.profiles.size || activeId != stored.activeId) {
+            // Write straight to prefs: this runs while profilesFlow is still
+            // being constructed, so it must not touch the flow.
+            prefs.edit()
+                .putString(KEY_PROFILES, json.encodeToString(ProviderProfilesValue(kept, activeId)))
+                .putString(KEY_ACTIVE_PROFILE, activeId)
+                .apply()
+        }
+        return ProviderProfilesValue(kept, activeId)
     }
 
     private fun defaultProfileValue(): ProviderProfilesValue =

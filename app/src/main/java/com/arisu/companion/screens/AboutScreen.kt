@@ -67,7 +67,7 @@ fun AboutScreen() {
             )
             PermissionRow(
                 "Internet",
-                "Direct requests to the AI provider you configure (OpenAI-compatible chat format). No key goes anywhere else.",
+                "Direct requests to Google AI Studio (Gemini API) using your own key. No key goes anywhere else.",
             )
             PermissionRow(
                 "Start after reboot",
