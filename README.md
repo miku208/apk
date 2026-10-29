@@ -158,7 +158,16 @@ Verified 29 Oct 2026 with a personal AI Studio key:
 | Streaming chat (`?alt=sse`, `x-goog-api-key` header) | text streamed, key absent from the URL |
 | Unknown model ID | HTTP 404 mapped to "Model tidak ditemukan…" |
 | Invalid key | HTTP 400 `API_KEY_INVALID` → "API key Gemini tidak valid…" |
+| `gemini-3.1-flash-lite` (default) | answered in ~0.9 s |
+| `gemini-3.5-flash-lite` | answered in ~1.6 s |
+| `gemini-3.6-flash` | answered in ~1.2 s |
+| `gemini-3.8-flash` | **503 UNAVAILABLE / hangs**: server reported "currently experiencing high demand" (reproduced with curl, so not the client) |
+| `gemini-3.1-pro-preview` | HTTP 429 — no free-tier quota for Pro models |
 | Image model `gemini-3.1-flash-image` | **untested live**: free tier answers HTTP 429 with `limit: 0`, billing required. Parsing of `inlineData` is covered by `GeminiProtocolTest`. |
+
+The model sweep fails the build only when a model rejects the request for a
+reason other than quota (429/403), overload (503) or a stall, so a real
+regression is still caught while account limits stay visible in the log.
 
 ## What changed in 0.2 — root causes of the animation bugs
 

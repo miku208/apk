@@ -123,6 +123,75 @@ class GeminiLiveTest {
     }
 
     @Test
+    fun `every advertised chat model answers a real request`() = runBlocking {
+        live()
+        val apiKey = key()
+        val failures = linkedMapOf<String, String>()
+        val answered = mutableListOf<String>()
+        // Shorter than the app's 120 s: a model that never streams must not stall
+        // the whole run for two minutes per iteration.
+        val quickClient = GeminiClient(
+            okhttp3.OkHttpClient.Builder()
+                .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
+                .writeTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                .build(),
+        )
+
+        for (model in GeminiProtocol.chatModels) {
+            val chunks = mutableListOf<String>()
+            val started = System.currentTimeMillis()
+            val outcome = try {
+                quickClient.chat(
+                    profile = profile.copy(modelId = model),
+                    apiKeyPlain = apiKey,
+                    systemInstruction = "Jawab dengan satu kata saja.",
+                    messages = listOf("user" to "Balas: pong"),
+                    temperature = 0f,
+                    maxTokens = 24,
+                    streaming = true,
+                    onDelta = { chunks += it },
+                )
+            } catch (e: java.io.IOException) {
+                GeminiClient.Result.Failure("network: ${e.javaClass.simpleName}: ${e.message}", "")
+            }
+            val elapsed = System.currentTimeMillis() - started
+            when (outcome) {
+                is GeminiClient.Result.Success -> {
+                    val text = chunks.joinToString("").trim()
+                    println("$model -> OK (${chunks.size} chunks, ${elapsed}ms): $text")
+                    if (text.isBlank()) failures[model] = "empty reply" else answered += model
+                }
+                is GeminiClient.Result.Failure -> {
+                    println("$model -> FAIL (${elapsed}ms): ${outcome.message}")
+                    failures[model] = outcome.message
+                }
+            }
+            // Stay under the per-minute free-tier rate limit while sampling them all.
+            kotlinx.coroutines.delay(1_000)
+        }
+
+        // A per-model quota of zero, a billing wall, or a transient 503 is a
+        // property of the account or the moment, not of our request shape; those
+        // are reported in the log but do not fail the run. Anything else is a bug.
+        val tolerated = failures.filterValues { message ->
+            message.contains("429") || message.contains("403") ||
+                message.contains("Kuota", ignoreCase = true) || message.contains("503") ||
+                message.contains("high demand", ignoreCase = true) ||
+                // Observed on gemini-3.8-flash: the server accepts the request and
+                // then sends nothing (a separate curl run saw the same hang, another
+                // got 503). Not something the client can fix; still fatal if every
+                // model hangs, which the check below enforces.
+                message.contains("SocketTimeoutException")
+        }.keys
+        val realFailures = failures.filterKeys { it !in tolerated }
+        assertTrue("models rejected the request: $realFailures", realFailures.isEmpty())
+        assertTrue("no chat model answered at all: $failures", answered.isNotEmpty())
+        println("answered: $answered")
+        println("limited by account/server: $tolerated")
+    }
+
+    @Test
     fun `image model returns inline image parts`() = runBlocking {
         live()
         assumeTrue("set GEMINI_IMAGE_TEST=1 (costs quota)", System.getenv("GEMINI_IMAGE_TEST") == "1")
