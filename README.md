@@ -1,9 +1,15 @@
 # Arisu Companion — floating 3D AI pet for Android
 
-A native Android application that renders the provided `Arisu (Maid).glb`
-character in a **transparent floating overlay window** above other apps, with a
-floating chat panel, BYOK AI providers, local chat history/memory, and
-optional push-to-talk voice.
+A native Android application that renders a 3D character in a **transparent
+floating overlay window** above other apps, with a floating chat panel, BYOK AI
+providers (OpenAI-compatible **and** Google AI Studio / Gemini), local chat
+history/memory, and optional push-to-talk voice.
+
+Version 0.2 adds a **Pet Library** (import your own `.glb` / `.gltf`+ZIP
+characters, live preview, rename/delete, per-character animation mapping and
+personality), a rewritten **animation state machine** that removes the stutter
+and random-clip bugs of 0.1, an **idle "sulking" behaviour**, and **native
+Gemini** support. Arisu stays the bundled default character.
 
 - **Technology:** Kotlin, Jetpack Compose + Material 3, Filament/gltfio 3D
   rendering (real-time GLB skeletal animation), Room/SQLite, OkHttp (streaming
@@ -51,12 +57,23 @@ The character model must exist at `app/src/main/assets/Arisu (Maid).glb`
 
 ```
 app/src/main/java/com/arisu/companion/
-├── MainActivity.kt            # six-tab Compose app (Home/AI/Pet/Persona/History/About)
+├── MainActivity.kt            # seven-tab Compose app (Home/AI/Pet/Model/Persona/History/About)
 ├── ArisuApplication.kt        # AppContainer (small hand-rolled DI)
 ├── renderer/
 │   ├── ArisuRenderer.kt       # Filament engine + transparent swapchain + GLB load/anim loop
+│   ├── FramePacer.kt          # testable frame pacing (FPS cap + stall clamping)
 │   └── GlbParser.kt           # pure GLB container inspector (tests + diagnostics)
-├── animation/PetAnimation.kt  # PetState enum + clip-name strategy mapper
+├── animation/
+│   ├── PetAnimation.kt        # PetState enum + keyword/override clip mapper
+│   └── PetStateMachine.kt     # the single authoritative animation state machine
+├── pet/
+│   ├── PetProfile.kt          # per-character config + personality
+│   ├── PetLibrary.kt          # private storage, import/rename/delete/active
+│   ├── PetModelInspector.kt   # pure GLB/glTF-ZIP validation
+│   └── GltfAssetPacker.kt     # pure .gltf + side-cars -> single .glb packer
+├── behavior/
+│   ├── IdleTimer.kt           # monotonic idle latch + quiet hours
+│   └── IdleMessages.kt        # local idle lines (never an API call)
 ├── overlay/
 │   ├── FloatingPetService.kt  # foreground service; hosts pet window + chat window
 │   ├── OverlayGeometry.kt     # pure math: clamping, snap, panel geometry
@@ -118,6 +135,71 @@ app/build/outputs/apk/debug/app-debug.apk     90 MB  (debug, all ABIs)
 app/build/outputs/apk/release/app-release.apk 37 MB  (release, all ABIs)
 ```
 
+## What changed in 0.2 — root causes of the animation bugs
+
+These were found by reading the 0.1 renderer, not guessed:
+
+1. **Stutter (the big one).** The loop did `if (now - lastRendered <
+   frameInterval) return` with `frameInterval = 1e9/60 = 16 666 666 ns` while a
+   60 Hz Choreographer vsync is `16 666 666 ns` — identical in theory, but any
+   ns of jitter skipped the frame, and skipping reset nothing, so every second
+   vsync was dropped: an alternating 60/30 fps pattern. Fixed by
+   `FramePacer` (accumulator + 1 % tolerance) and covered by
+   `FramePacerTest`.
+2. **Jerky/teleporting poses.** Animation time was `System.nanoTime() -
+   stateEnteredNanos`, i.e. wall-clock driven. One dropped frame (GC, window
+   focus change, screen on) fast-forwarded the clip by the whole gap. The
+   state machine now advances only by the clamped frame delta (`<= 250 ms`),
+   so time in the pet never jumps.
+3. **Random "strange movements".** `driveAnimation` re-resolved
+   `bestFor(state)` every frame and did `indexOf(...).let { if (it < 0) 0 }`:
+   an unresolved clip silently played **clip 0**, which for this asset is
+   `Cafe_Reaction` (an attack pose). It also restarted the clip whenever the
+   resolution changed. Now the clip is resolved once per state change and a
+   missing clip keeps the current pose instead of substituting clip 0.
+4. **Inconsistent transitions.** There was no cross-fade at all, and the
+   one-shot → idle switch happened inside the render callback, mutating state
+   nobody else could observe. `PetStateMachine` owns the transition and the
+   renderer applies `applyAnimation → applyCrossFade → updateBoneMatrices`
+   (the order Filament documents), falling back to hard switches if an asset
+   cannot blend.
+5. **Thread race.** `ChatEngine.petStateFlow` was collected on
+   `Dispatchers.Default` while Choreographer ran the renderer on the main
+   thread, so `setPetState` could mutate the animator mid-frame. State
+   requests are now `@Volatile` and applied on the render thread; the service
+   collects on `Dispatchers.Main`.
+6. **Root transform.** The old code composed translate/scale/rotate with
+   helpers that applied the translation *unscaled* (the model was offset by
+   an un-normalised centre). The matrix is now built explicitly as
+   `R(yaw) · S(scale) · T(-centre)` and re-applied after the animation each
+   frame, so a clip with root motion cannot teleport the character.
+7. **Focus/background handling.** Resuming after the overlay regained focus
+   kept the stale timestamp, so the first frame advanced the clip by the whole
+   pause. Pausing now resets the pacer.
+
+## Idle behaviour (sulking)
+
+After `idleTimeoutSeconds` (default **60 s**) without a tap, drag, chat message,
+settings visit or screen-on, the pet enters `SULKING`: it turns away ~13° and
+drops slightly (eased, so no pop), plays the character's own sulk clip when one
+exists, and shows a small speech bubble with a **local** line ("Arisu dicuekin
+lagi..."). The timer is a latched monotonic timer, so one idle period produces
+exactly one reaction and never one per tick. Quiet hours, screen-off and
+"reduced motion" suppress it. No API call, no notification.
+
+## Gemini (Google AI Studio)
+
+Add a profile under **AI → Google Gemini**, paste a key from
+`https://aistudio.google.com/apikey` (stored with AES/GCM + Android Keystore)
+and press **Test connection**. Implemented against the documented API
+(`POST {base}/models/{model}:streamGenerateContent?alt=sse`, `x-goog-api-key`,
+`contents[].role` = `user`/`model`, `systemInstruction`,
+`generationConfig.{temperature,maxOutputTokens,responseModalities}`).
+Defaults: `gemini-3.1-flash-lite`, image model `gemini-3.1-flash-image`.
+Sending `/img <prompt>` uses the image model; inline `inlineData` image parts
+are decoded, saved to app-private storage and shown in the chat bubble instead
+of being mistaken for text.
+
 Release APK checks run here, all static:
 
 - `apksigner verify --print-certs` — signed with the local development key
@@ -162,6 +244,18 @@ Asset inspection of the shipped model (measured, not assumed): glTF 2.0,
 - **API key storage** (`CryptoStoreTest`) — AES/GCM round-trip, tamper and
   wrong-key rejection (Device Keystore itself requires an Android JVM).
 - **Memory proposals** (`MemoryExtractorTest`).
+- **State machine** (`PetStateMachineTest`) — one-shot settling, cross-fade
+  alpha, dt clamping, missing clips, per-character overrides.
+- **Frame pacing** (`FramePacerTest`) — the 60 Hz stutter regression, the
+  30 fps cap, stall clamping, out-of-order timestamps.
+- **Model import** (`PetModelInspectorTest`) — GLB passthrough, glTF+ZIP
+  packing (buffer rebasing, data-URI textures, URL-encoded names), missing
+  assets, ZIP path traversal, mesh-less files, and the real bundled asset.
+- **Gemini protocol** (`GeminiProtocolTest`) — endpoints, request shape,
+  role mapping, SSE text/image parts, safety blocks, quota/API-key/billing
+  error mapping.
+- **Idle behaviour** (`IdleTimerTest`) — fires once per idle period, reset on
+  interaction, cancel on screen-off, quiet-hours wrap, local messages.
 
 What the tests do *not* cover, because they need a device: overlay
 attach/detach against the real WindowManager, Filament/EGL rendering, Room on
@@ -197,6 +291,21 @@ paths compile and are wired, but are not hardware-verified.
   not auto-fitted per frame.
 - `testConnection` sends a single tiny completion ("ping") and bills a few
   tokens per attempt.
+- **Imported models are not device-verified.** The GLB/glTF inspection, ZIP
+  repacking and clip discovery are unit-tested on the JVM, and the renderer
+  reports load failures through `onFatal`, but "this specific model renders
+  correctly on Filament" can only be confirmed on a device.
+- Cross-fades rely on `Animator.applyCrossFade`. If an imported asset's rig
+  cannot blend, the renderer logs it once and falls back to hard clip switches.
+- The Pet Library preview opens a **second** Filament engine while the floating
+  pet is running. It is destroyed when the preview closes, but on very low-RAM
+  devices the preview can be the first thing to be killed.
+- DB schema v2 (`chat_messages.images`) ships with a hand-written Room
+  migration (`ALTER TABLE … DEFAULT ''`). It is exercised by construction only;
+  no device/emulator ran it here.
+- `gemini-3.1-flash-lite` / `gemini-3.1-flash-image` were the documented model
+  IDs at implementation time (checked October 2026); model availability is a
+  Google-side decision and the field stays editable for that reason.
 
 ## Legal notes
 

@@ -3,18 +3,31 @@ package com.arisu.companion.ai
 import kotlinx.serialization.Serializable
 
 /**
- * Bring-your-own-key provider configuration. Everything is user-editable:
- * we implement the widely supported OpenAI-compatible chat completions
- * format ("/chat/completions", "Authorization: Bearer <key>",
- * messages array, `delta.content` streaming chunks).
+ * Wire protocol a profile speaks.
+ *
+ * [OPENAI_COMPAT] is the existing format (`/chat/completions`,
+ * `Authorization: Bearer <key>`, `delta.content` chunks). [GEMINI] is Google AI
+ * Studio's native API, which has a different endpoint, auth header and body
+ * shape — see [GeminiProtocol].
+ */
+@Serializable
+enum class ProviderKind { OPENAI_COMPAT, GEMINI }
+
+/**
+ * Bring-your-own-key provider configuration. Everything is user-editable.
+ * The API key is stored encrypted at rest (AES/GCM, Android Keystore).
  */
 @Serializable
 data class ProviderProfile(
     val id: String,
     val name: String,
-    /** OpenAI-compatible base URL, WITHOUT trailing slash, no "/chat/completions" suffix. */
+    /**
+     * Base URL without a trailing slash. For [ProviderKind.OPENAI_COMPAT] this
+     * must NOT include "/chat/completions"; for [ProviderKind.GEMINI] it is the
+     * API root, e.g. `https://generativelanguage.googleapis.com/v1beta`.
+     */
     val baseUrl: String,
-    /** Stored encrypted at rest (AES/GCM, Android Keystore). */
+    /** Stored encrypted at rest. Never logged. */
     val apiKeyCipher: String = "",
     val modelId: String = "",
     val temperature: Float? = null,
@@ -22,19 +35,34 @@ data class ProviderProfile(
     val streaming: Boolean = true,
     /** Same cipher as the header value would be; custom endpoints may need it. */
     val authScheme: AuthScheme = AuthScheme.BEARER,
+    val kind: ProviderKind = ProviderKind.OPENAI_COMPAT,
+    /** Gemini only: model used for image requests (empty = disabled). */
+    val imageModelId: String = "",
 ) {
     @Serializable
     enum class AuthScheme { BEARER, NONE }
+
+    val isGemini: Boolean get() = kind == ProviderKind.GEMINI
 
     fun clone(id: String = java.util.UUID.randomUUID().toString()): ProviderProfile =
         copy(id = id, name = "$name (copy)")
 
     companion object {
         /**
-         * Built-in provider catalog. Each entry documents exactly what is verified;
-         * unverifiable ones ship with manual configuration nudge text.
+         * Built-in provider catalog. Every https endpoint here is the provider's
+         * documented API host; the two "unverified" entries keep a manual base
+         * URL the user is expected to confirm.
          */
         fun builtins(): List<ProviderProfile> = listOf(
+            ProviderProfile(
+                id = "gemini",
+                name = "Google Gemini",
+                baseUrl = GeminiProtocol.DEFAULT_BASE_URL,
+                modelId = GeminiProtocol.DEFAULT_CHAT_MODEL,
+                imageModelId = GeminiProtocol.DEFAULT_IMAGE_MODEL,
+                kind = ProviderKind.GEMINI,
+                authScheme = AuthScheme.NONE,
+            ),
             ProviderProfile(
                 id = "nvidia",
                 name = "NVIDIA API",
@@ -64,19 +92,26 @@ data class ProviderProfile(
         )
 
         fun default(): ProviderProfile = builtins().first().clone(id = "default")
+
+        const val GEMINI_ID = "gemini"
+        const val GEMINI_KEY_URL = "https://aistudio.google.com/apikey"
     }
 
     fun validate(): List<String> {
         val problems = mutableListOf<String>()
         val url = baseUrl.trim().removeSuffix("/")
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            problems += "Base URL must start with http:// or https://"
+            problems += "Base URL harus diawali http:// atau https://"
         }
-        if (url.endsWith("/chat/completions")) {
-            problems += "Base URL already ends with /chat/completions — remove that suffix"
+        if (kind == ProviderKind.OPENAI_COMPAT) {
+            if (url.endsWith("/chat/completions")) {
+                problems += "Base URL sudah berakhiran /chat/completions — hapus bagian itu"
+            }
+        } else if (url.contains(":generateContent") || url.contains(":streamGenerateContent")) {
+            problems += "Untuk Gemini, isi base URL tanpa metode (:generateContent)"
         }
-        if (apiKeyCipher.isBlank()) problems += "API key is missing in this profile"
-        if (modelId.isBlank()) problems += "Model ID is empty"
+        if (apiKeyCipher.isBlank()) problems += "API key belum diisi untuk profil ini"
+        if (modelId.isBlank()) problems += "Model ID masih kosong"
         return problems
     }
 }

@@ -53,6 +53,7 @@ fun AiSettingsScreen(activity: MainActivity) {
                     streaming = profile.streaming,
                     temperature = profile.temperature ?: 0.8f,
                     maxTokens = profile.maxTokens ?: 512,
+                    imageModelId = profile.imageModelId,
                 )
             },
         )
@@ -71,9 +72,10 @@ fun AiSettingsScreen(activity: MainActivity) {
     ) {
         Text("AI providers (BYOK)", style = MaterialTheme.typography.headlineSmall)
         Text(
-            "Every provider uses the OpenAI-compatible chat format: POST {base}/chat/completions " +
-                "with \"Authorization: Bearer <key>\". Your key stays on this device, encrypted. " +
-                "For unverified providers (TokenHarbor, custom), adjust the Base URL to whatever your provider documents.",
+            "BYOK: key disimpan terenkripsi di perangkat ini saja, tidak pernah dikirim ke mana pun " +
+                "selain ke provider yang kamu pilih. Profil \"Google Gemini\" memakai API resmi AI Studio " +
+                "(models/…:generateContent); profil lain memakai format OpenAI-compatible " +
+                "POST {base}/chat/completions.",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -128,6 +130,57 @@ fun AiSettingsScreen(activity: MainActivity) {
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (editable.isGemini) {
+                    Text(
+                        "Model Gemini",
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.padding(top = 10.dp),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        com.arisu.companion.ai.GeminiProtocol.chatModels.take(3).forEach { model ->
+                            FilterChip(
+                                selected = draft.modelId == model,
+                                onClick = { drafts = drafts + (editable.id to draft.copy(modelId = model)) },
+                                label = {
+                                    Text(
+                                        model.removePrefix("gemini-"),
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                },
+                            )
+                        }
+                    }
+                    OutlinedTextField(
+                        value = draft.imageModelId,
+                        onValueChange = { model ->
+                            drafts = drafts + (editable.id to draft.copy(imageModelId = model.trim()))
+                        },
+                        label = { Text("Model gambar (opsional)") },
+                        supportingText = {
+                            Text("Dipakai untuk perintah \"/img <prompt>\". Contoh: gemini-3.1-flash-image")
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        "⚠️ Pemakaian Gemini API ditagih ke akun Google kamu sendiri. Ada kuota gratis, " +
+                            "tapi model tertentu butuh billing aktif. Gambar yang dikembalikan model gambar " +
+                            "disimpan di penyimpanan privat aplikasi.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                    TextButton(onClick = {
+                        runCatching {
+                            activity.startActivity(
+                                android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse(ProviderProfile.GEMINI_KEY_URL),
+                                ),
+                            )
+                        }
+                    }) { Text("Buat API key di AI Studio") }
+                }
+
                 LabeledSlider(
                     label = "Temperature",
                     value = draft.temperature,
@@ -162,10 +215,12 @@ fun AiSettingsScreen(activity: MainActivity) {
                         val profile = ProfileSaver.applyDraft(store, profilesValue, editable, draft)
                         scope.launch {
                             testResult = "Testing…"
-                            val (ok, msg) = activity.container.aiClient.testConnection(
-                                profile,
-                                store.decryptKey(profile.apiKeyCipher),
-                            )
+                            val key = store.decryptKey(profile.apiKeyCipher)
+                            val (ok, msg) = if (profile.isGemini) {
+                                activity.container.geminiClient.testConnection(profile, key)
+                            } else {
+                                activity.container.aiClient.testConnection(profile, key)
+                            }
                             testResult = if (ok) "✔ $msg" else "✘ $msg"
                         }
                     }) { Text("Test connection") }
@@ -209,6 +264,7 @@ data class DraftProfile(
     val streaming: Boolean,
     val temperature: Float,
     val maxTokens: Int,
+    val imageModelId: String = "",
 )
 
 object ProfileSaver {
@@ -233,6 +289,7 @@ object ProfileSaver {
             streaming = draft.streaming,
             temperature = draft.temperature,
             maxTokens = draft.maxTokens,
+            imageModelId = draft.imageModelId.trim(),
         )
     }
 }

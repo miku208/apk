@@ -3,6 +3,8 @@ package com.arisu.companion.settings
 import android.content.Context
 import android.content.SharedPreferences
 import com.arisu.companion.ai.ProviderProfile
+import com.arisu.companion.behavior.IdleTimer
+import com.arisu.companion.behavior.QuietHours
 import com.arisu.companion.security.CryptoStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -129,6 +131,81 @@ class AppStateStore(context: Context, private val crypto: CryptoStore) {
         tapOpensChatFlow.value = enabled
     }
 
+    // ---- Idle behaviour (sulking) -----------------------------------------
+
+    private val sulkFlow = MutableStateFlow(prefs.getBoolean(KEY_SULK, true))
+    private val idleTimeoutFlow = MutableStateFlow(
+        prefs.getInt(KEY_IDLE_TIMEOUT, (IdleTimer.DEFAULT_TIMEOUT_MS / 1000).toInt()),
+    )
+    private val idleBubbleFlow = MutableStateFlow(prefs.getBoolean(KEY_IDLE_BUBBLE, true))
+    private val animSpeedFlow = MutableStateFlow(prefs.getFloat(KEY_ANIM_SPEED, 1f))
+    private val reducedMotionFlow = MutableStateFlow(prefs.getBoolean(KEY_REDUCED_MOTION, false))
+    private val quietEnabledFlow = MutableStateFlow(prefs.getBoolean(KEY_QUIET_ON, false))
+    private val quietStartFlow = MutableStateFlow(prefs.getInt(KEY_QUIET_START, 23))
+    private val quietEndFlow = MutableStateFlow(prefs.getInt(KEY_QUIET_END, 7))
+    private val debugOverlayFlow = MutableStateFlow(prefs.getBoolean(KEY_DEBUG_OVERLAY, false))
+
+    /** Playful sulk after [idleTimeoutSeconds] without interaction. */
+    val sulkingEnabled: StateFlow<Boolean> get() = sulkFlow
+    val idleTimeoutSeconds: StateFlow<Int> get() = idleTimeoutFlow
+    val idleSpeechBubble: StateFlow<Boolean> get() = idleBubbleFlow
+    val animationSpeed: StateFlow<Float> get() = animSpeedFlow
+    val reducedMotion: StateFlow<Boolean> get() = reducedMotionFlow
+    val quietHoursEnabled: StateFlow<Boolean> get() = quietEnabledFlow
+    val quietStartHour: StateFlow<Int> get() = quietStartFlow
+    val quietEndHour: StateFlow<Int> get() = quietEndFlow
+    val debugOverlay: StateFlow<Boolean> get() = debugOverlayFlow
+
+    fun saveSulkingEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SULK, enabled).apply()
+        sulkFlow.value = enabled
+    }
+
+    fun saveIdleTimeoutSeconds(seconds: Int) {
+        val v = seconds.coerceIn((IdleTimer.MIN_TIMEOUT_MS / 1000).toInt(), (IdleTimer.MAX_TIMEOUT_MS / 1000).toInt())
+        prefs.edit().putInt(KEY_IDLE_TIMEOUT, v).apply()
+        idleTimeoutFlow.value = v
+    }
+
+    fun saveIdleSpeechBubble(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_IDLE_BUBBLE, enabled).apply()
+        idleBubbleFlow.value = enabled
+    }
+
+    fun saveAnimationSpeed(speed: Float) {
+        val v = speed.coerceIn(0.25f, 3f)
+        prefs.edit().putFloat(KEY_ANIM_SPEED, v).apply()
+        animSpeedFlow.value = v
+    }
+
+    fun saveReducedMotion(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_REDUCED_MOTION, enabled).apply()
+        reducedMotionFlow.value = enabled
+    }
+
+    fun saveQuietHoursEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_QUIET_ON, enabled).apply()
+        quietEnabledFlow.value = enabled
+    }
+
+    fun saveQuietWindow(startHour: Int, endHour: Int) {
+        val start = startHour.coerceIn(0, 23)
+        val end = endHour.coerceIn(0, 23)
+        prefs.edit().putInt(KEY_QUIET_START, start).putInt(KEY_QUIET_END, end).apply()
+        quietStartFlow.value = start
+        quietEndFlow.value = end
+    }
+
+    fun saveDebugOverlay(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_DEBUG_OVERLAY, enabled).apply()
+        debugOverlayFlow.value = enabled
+    }
+
+    /** True when the sulk bubble must stay quiet right now. */
+    fun isQuietNow(hourOfDay: Int = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)): Boolean =
+        quietEnabledFlow.value &&
+            QuietHours.isQuiet(hourOfDay, quietStartFlow.value, quietEndFlow.value)
+
     private val autoStartFlow = MutableStateFlow(prefs.getBoolean(KEY_AUTO_START, false))
     val autoStartOnBoot: StateFlow<Boolean> get() = autoStartFlow
 
@@ -235,6 +312,15 @@ class AppStateStore(context: Context, private val crypto: CryptoStore) {
         private const val KEY_SNAP = "snap_to_edge"
         private const val KEY_TAP_CHAT = "tap_opens_chat"
         private const val KEY_AUTO_START = "auto_start_on_boot"
+        private const val KEY_SULK = "sulking_enabled"
+        private const val KEY_IDLE_TIMEOUT = "idle_timeout_seconds"
+        private const val KEY_IDLE_BUBBLE = "idle_speech_bubble"
+        private const val KEY_ANIM_SPEED = "animation_speed"
+        private const val KEY_REDUCED_MOTION = "reduced_motion"
+        private const val KEY_QUIET_ON = "quiet_hours_enabled"
+        private const val KEY_QUIET_START = "quiet_start_hour"
+        private const val KEY_QUIET_END = "quiet_end_hour"
+        private const val KEY_DEBUG_OVERLAY = "animation_debug_overlay"
         private const val KEY_SYSTEM_PROMPT = "system_prompt"
         private const val KEY_NICKNAME = "nickname"
         private const val KEY_LANGUAGE = "preferred_language"

@@ -1,5 +1,6 @@
 package com.arisu.companion.chat
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -41,6 +42,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
@@ -251,6 +254,32 @@ private fun MemoryProposalBanner(engine: ChatEngine, proposal: String) {
     }
 }
 
+/** Inline images returned by a Gemini image model (e.g. gemini-3.1-flash-image). */
+@Composable
+private fun MessageImages(paths: List<String>) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        paths.forEach { path ->
+            val bitmap = remember(path) { android.graphics.BitmapFactory.decodeFile(path) }
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = "Gambar dari AI",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(160.dp)
+                        .clip(RoundedCornerShape(12.dp)),
+                )
+            } else {
+                Text(
+                    "🖼️ gambar tidak bisa dibuka",
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun MessageBubble(
     message: ChatUiMessage,
@@ -275,9 +304,13 @@ private fun MessageBubble(
             modifier = Modifier.widthIn(max = 300.dp),
         ) {
             Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                if (message.images.isNotEmpty()) {
+                    MessageImages(message.images)
+                }
                 Text(
                     when {
                         message.content.isNotEmpty() -> message.content
+                        message.images.isNotEmpty() -> ""
                         message.streaming -> "…"
                         else -> "(empty)"
                     },

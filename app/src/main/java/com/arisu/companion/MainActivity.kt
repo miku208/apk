@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Face
+import androidx.compose.material.icons.rounded.Pets
 import androidx.compose.material.icons.rounded.Chat
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Info
@@ -34,6 +35,7 @@ import com.arisu.companion.overlay.FloatingPetService
 import com.arisu.companion.screens.AboutScreen
 import com.arisu.companion.screens.AiSettingsScreen
 import com.arisu.companion.screens.HomeScreen
+import com.arisu.companion.screens.PetLibraryScreen
 import com.arisu.companion.screens.PetSettingsScreen
 import com.arisu.companion.screens.PersonalityScreen
 import com.arisu.companion.ui.ArisuTheme
@@ -99,6 +101,7 @@ class MainActivity : ComponentActivity() {
             TabItem("home", Icons.Rounded.Home, "Arisu"),
             TabItem("ai", Icons.Rounded.Chat, "AI"),
             TabItem("pet", Icons.Rounded.Face, "Pet"),
+            TabItem("library", Icons.Rounded.Pets, "Model"),
             TabItem("persona", Icons.Rounded.Psychology, "Persona"),
             TabItem("history", Icons.Rounded.Settings, "History"),
             TabItem("about", Icons.Rounded.Info, "About"),
@@ -128,6 +131,7 @@ class MainActivity : ComponentActivity() {
                     )
                     "ai" -> AiSettingsScreen(activity = this@MainActivity)
                     "pet" -> PetSettingsScreen(activity = this@MainActivity)
+                    "library" -> PetLibraryScreen(activity = this@MainActivity)
                     "persona" -> PersonalityScreen(activity = this@MainActivity)
                     "history" -> com.arisu.companion.screens.ChatHistoryScreen(activity = this@MainActivity)
                     else -> AboutScreen()

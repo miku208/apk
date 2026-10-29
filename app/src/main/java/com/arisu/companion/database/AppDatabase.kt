@@ -21,6 +21,9 @@ data class ChatMessageEntity(
     val timestamp: Long = System.currentTimeMillis(),
     /** Non-null when generation was interrupted / failed; used for retry. */
     val failed: Boolean = false,
+    /** Newline separated absolute paths to provider-returned images (Gemini). */
+    @androidx.room.ColumnInfo(defaultValue = "")
+    val images: String = "",
 )
 
 @Entity(tableName = "memories")
@@ -82,7 +85,7 @@ interface MemoryDao {
 
 @Database(
     entities = [ChatMessageEntity::class, MemoryEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -90,8 +93,16 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun memoryDao(): MemoryDao
 
     companion object {
+        /** v2 adds `chat_messages.images` without touching existing history. */
+        private val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE chat_messages ADD COLUMN images TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "arisu.db")
+                .addMigrations(MIGRATION_1_2)
                 .fallbackToDestructiveMigration()
                 .build()
     }
