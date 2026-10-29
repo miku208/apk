@@ -31,7 +31,15 @@ systemctl reset-failed "$UNIT" 2>/dev/null
 "$GRADLE" --stop >/dev/null 2>&1
 : > "$GUARD_LOG"
 
+# Opt-in live-test switches (and the key they need) are passed through only
+# when the caller exported them; nothing is read from disk.
+ENV_ARGS=()
+for var in GEMINI_LIVE_TESTS GEMINI_IMAGE_TEST GEMINI_API_KEY; do
+  [ -n "${!var:-}" ] && ENV_ARGS+=(--setenv="$var=${!var}")
+done
+
 systemd-run --unit="$UNIT" --collect --service-type=exec \
+  "${ENV_ARGS[@]}" \
   --property=CPUQuota=150% \
   --property=MemoryHigh=2200M \
   --property=MemoryMax=2800M \

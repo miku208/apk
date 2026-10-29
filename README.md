@@ -131,13 +131,34 @@ Built and tested here with JDK 21, Android SDK platform 34 / build-tools 34.0.0,
 Gradle 8.7 (no Android device or emulator available):
 
 ```
-:app:testReleaseUnitTest  72 tests, 0 failures, 0 errors, 0 skipped
+:app:testReleaseUnitTest  77 tests, 0 failures, 0 errors, 4 skipped (opt-in live tests)
 :app:assembleDebug       BUILD SUCCESSFUL
 :app:assembleRelease     BUILD SUCCESSFUL  (R8 shrink + resource shrink + signing)
 
 app/build/outputs/apk/debug/app-debug.apk     90 MB  (debug, all ABIs)
 app/build/outputs/apk/release/app-release.apk 37 MB  (release, all ABIs)
 ```
+
+### Live Gemini check (real key, real endpoint)
+
+`ai/GeminiLiveTest` drives the shipping `GeminiClient`/`GeminiProtocol` against
+`generativelanguage.googleapis.com`. It is skipped unless the switches below are
+exported, so normal builds stay offline:
+
+```bash
+GEMINI_LIVE_TESTS=1 GEMINI_API_KEY=... ./tools/build-limited.sh testReleaseUnitTest
+GEMINI_LIVE_TESTS=1 GEMINI_IMAGE_TEST=1 GEMINI_API_KEY=...   # adds the image model
+```
+
+Verified 29 Oct 2026 with a personal AI Studio key:
+
+| Check | Result |
+|-------|--------|
+| `Test Connection` (non-streaming, `testConnection`) | ok — "Tersambung ke gemini-3.1-flash-lite" |
+| Streaming chat (`?alt=sse`, `x-goog-api-key` header) | text streamed, key absent from the URL |
+| Unknown model ID | HTTP 404 mapped to "Model tidak ditemukan…" |
+| Invalid key | HTTP 400 `API_KEY_INVALID` → "API key Gemini tidak valid…" |
+| Image model `gemini-3.1-flash-image` | **untested live**: free tier answers HTTP 429 with `limit: 0`, billing required. Parsing of `inlineData` is covered by `GeminiProtocolTest`. |
 
 ## What changed in 0.2 — root causes of the animation bugs
 
